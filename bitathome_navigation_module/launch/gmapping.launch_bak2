@@ -1,0 +1,9 @@
+<launch>
+<include file = "$(find bitathome_navigation_module)/launch/navigation_configuration.launch"/>
+<node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+		<param name = "odom_frame" value = "odom"/>
+		<param name = "scan" value = "scan"/>
+		<param name = "map_update_interval" value = "5" />
+		<param name = "angularUpdate" value = "0.1" />
+</node>
+</launch>

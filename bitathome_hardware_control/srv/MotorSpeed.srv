@@ -1,0 +1,7 @@
+int32 sFrontLeft
+int32 sFrontRight
+int32 sBack
+int32 sbLeft
+int32 sbRight
+---
+uint8 result

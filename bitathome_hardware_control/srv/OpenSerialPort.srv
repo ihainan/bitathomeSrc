@@ -1,0 +1,5 @@
+string serialPort
+int64 baudrate
+uint8 bytesize
+---
+int8 result

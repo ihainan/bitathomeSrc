@@ -1,0 +1,8 @@
+<launch>
+	<!-- tf 广播 -->
+	<node pkg = "bitathome_navigation_module" name = "tf_broadcaster" type = "tf_broadcaster" />
+	<!-- 激光扫描数据 -->
+	<include file = "$(find bitathome_navigation_module)/launch/kinect_laserscan.launch"/>
+	<!-- 里程计数据-->
+	<node pkg = "bitathome_hardware_control" name = "hc_odom_control" type = "hc_odom_control.py" />
+</launch>

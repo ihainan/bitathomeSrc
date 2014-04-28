@@ -1,0 +1,10 @@
+<launch>
+	<node name = "hc_serial_communication" pkg = "bitathome_hardware_control" type = "hc_serial_communication.py">
+	</node>
+	<node name = "hc_motion_control" pkg = "bitathome_hardware_control" type = "hc_motion_control.py">
+	</node>
+	<node name = "joy_node" pkg = "joy" type = "joy_node">
+	</node>
+	<node name = "hc_joystick_control" pkg = "bitathome_hardware_control" type = "hc_joystick_control.py">
+	</node>
+</launch>
