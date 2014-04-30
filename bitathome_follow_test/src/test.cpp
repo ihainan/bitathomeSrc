@@ -1,3 +1,5 @@
+#include "KinectSkeleton.hpp"
+#include "KinectVision.hpp"
 #include <stdio.h>
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
@@ -15,22 +17,6 @@
 
 using namespace std;
 
-enum SkeletonState{
-		NONE,					// 没有检测到骨架
-		STATIC,					// OpenNI Tracker 认为人没丢，但无法计算骨架位置
-		TRACKING,				// 正在被跟踪
-};
-
-// 骨架类
-class KinectSkeleton
-{
-		public:
-				map<string, cv::Point3d> points3D;					// 三维坐标点
-				map<string, cv::Point2d> points2D;					// 二维坐标点（图像上）
-				int userID;											// 用户 ID
-				SkeletonState state;								// 骨架当前状态
-};
-
 // 骨架视觉操作类
 class KinectSkeletonVision
 {
@@ -39,14 +25,22 @@ class KinectSkeletonVision
 		image_transport::CameraSubscriber sub_;		// 订阅返回对象
 		tf::TransformListener tf_listener_;			// 监听骨架 tf
 		image_geometry::PinholeCameraModel cam_model_;			// 坐标转换
-		list<KinectSkeleton> skeletons;				// 骨架
-		list<KinectSkeleton> lastSkeletons;	
 
-		// OpenCV 相关
+		list<KinectSkeleton> skeletons;				// 骨架
+		list<KinectSkeleton> lastSkeletons;			// 上一次存储的骨架
+
+		int lockUserID;								// 锁定用户 ID
+		KinectVision vision;						// 视觉图像处理对象
+		LockedUserState lockedUserState;			// 跟随用户的状态
+		char bodyStr[16][30] = {"head_", "neck_" "torso_", "left_shoulder_", "left_elbow_", "left_hand_", "right_shoulder_", "right_elbow_", "right_hand_", "left_hip_", "left_knee_", "left_foot_", "right_hip_", "right_knee_", "right_foot_"};
 
 		public :
 		// 构造函数
 		KinectSkeletonVision():it_(nh_){
+				// 初始化状态
+				lockedUserState = UNLOCKED;			// 最开始，尚未锁定
+				lockUserID = -1;
+
 				// 订阅图片主题
 				string image_topic = nh_.resolveName("/camera/rgb/image_color");	
 				sub_ = it_.subscribeCamera(image_topic, 1, &KinectSkeletonVision::imageCb, this);
@@ -92,19 +86,20 @@ class KinectSkeletonVision
 						// 获取 tf
 						tf_listener_.lookupTransform("openni_depth_frame", frame_id,
 										ros::Time(0), transform);
-						// 输出当前时间，以及 transform 的时间，以及差值
+
+						// 检测时间，如果长久不更新，代表骨架已经丢失
 						double s1 = transform.stamp_.toSec();
 						double s2 = ros::Time::now().toSec();
-						// cout << s1 << " " << s2 << " " << s2 - s1 << endl;
 						if (s2 - s1 > 0.1){
-								cout << "pass : " << frame_id << " " << s2 - s1 << endl;
 								continue;
 						}
-						// 检测时间，如果长久不更新，代表骨架已经丢失
+
+						// 坐标转换
 						tf::Point pt = transform.getOrigin();
-						cv::Point3d pt_cv(-pt.y(), -pt.z(), pt.x());
+						cv::Point3d pt_cv_t(-pt.y(), -pt.z(), pt.x());
 						cv::Point2d uv;
-						uv = cam_model_.project3dToPixel(pt_cv);
+						uv = cam_model_.project3dToPixel(pt_cv_t);
+						cv::Point3d pt_cv(pt.y(), pt.z(), pt.x());
 
 						// 存储
 						list<KinectSkeleton>::iterator v;
@@ -116,6 +111,7 @@ class KinectSkeletonVision
 										break;
 								}
 						}
+
 						// 该 UserID 之前没有存储过
 						if (v == skeletons.end()){
 								KinectSkeleton skeleton;
@@ -137,44 +133,129 @@ class KinectSkeletonVision
 						}
 				}
 
-				// 注意，此处得到的值为 z, x, y
+				// 做一些事情
+				doSomething(skeletons, cv_ptr -> image);
+
+				// 存储骨架，用于检测骨架是否静态丢失
+				lastSkeletons = skeletons;
+		}
+
+		// 获取到骨架和图片之后，做一些事情
+		void doSomething(list<KinectSkeleton> skeletons, cv::Mat image){
+				// 监控拿到的骨架，进行状态转换
 				if (!skeletons.empty()){
-						// cout << "检测到骨架" << endl;
 						list<KinectSkeleton>::iterator v;
+						// 遍历骨架
 						for(v = skeletons.begin(); v != skeletons.end(); ++v){
 								KinectSkeleton s = *v;
 								if(s.state == STATIC){
 										// cout << "骨架" << s.userID << " 静止" << endl;
+										// 骨架丢失
+										if(lockUserID == s.userID){
+												this -> lockedUserState = LOST;
+												cout << "跟踪丢失" << endl;
+										}
 								}
 								else{
-										cout << "骨架" << s.userID << " : ";
-										cv::Point3d points = s.points3D["torso_"];
-										// cout << "(" << points.x << ", " << points.y << ", " << points.z << ")" << endl;
-										cout << s.points2D["torso_"].x << " " << s.points2D["torso_"].y << endl;
-										cv::circle(cv_ptr -> image, s.points2D["torso_"], 3, CV_RGB(255,0,0), -1);
+										// 在图像中显示骨架
+										cv::circle(image, s.points2D["torso_"], 3, CV_RGB(255,0,0), -1);
+										cv::circle(image, s.points2D["left_shoulder_"], 3, CV_RGB(255,0,0), -1);
+										cv::circle(image, s.points2D["right_shoulder_"], 3, CV_RGB(255,0,0), -1);
+
+										// 如果之前骨架丢失，判断当前所检测到的骨架是不是原来的锁定者
+										if(this -> lockedUserState == LOST){
+														cv::Mat currentUserImage = vision.getClipedImage(image, s);
+														if(currentUserImage.rows > 0){
+
+																double confidence = vision.getDifference(currentUserImage);
+																cout << "相似度：" << confidence << endl;
+																if(confidence >= 90){
+																		this -> lockedUserState = FOLLOWING;
+																		this -> lockUserID = s.userID;
+																		cout << "找回目标" << endl;
+																}
+														}
+										}
+
+
+										// 如果当前状态是跟随，并且当前骨架是被跟随着，则运动
+										if(this -> lockedUserState == FOLLOWING && lockUserID == s.userID){
+												// 更新图像
+												cv::Mat currentUserImage = vision.getClipedImage(image, s);
+												/*
+												if(currentUserImage.rows > 0){
+														vision.newKinectVision(image, s);
+														cv::imshow("user_now", currentUserImage);
+														cv::waitKey(3);
+												}
+												*/
+												// 如果收到了暂停的手势，则暂停，计时
+												// 如果当前收到了识别的手势，则暂停，等待视野中出现两个人
+												// 如果收到了停止的手饰，则停止
+												// 设置速度，正常运动
+										}
+
+										// 如果当前状态是暂停，则计算时间是否到达
+										if(this -> lockedUserState == PAUSE && lockUserID == s.userID){
+										}
+
+
+										// 如果当前状态是未锁定，且有人举手，则锁定，存储图像特征
+										if(this -> lockedUserState == UNLOCKED  && checkSkeletonGesture(s) == RAISELEFTHAND){
+												lockUserID = s.userID;
+												this -> lockedUserState = FOLLOWING;
+												vision.newKinectVision(image, s);
+										}
 								}
 						}
 				}
 				else{
-						cout << "无骨架" << endl;
+						// 骨架丢失
+						if(lockUserID != -1){
+								this -> lockedUserState = LOST;
+								cout << "跟踪丢失" << endl;
+						}
 				}
 
-				// 存储骨架，用于检测骨架是否静态丢失
-				lastSkeletons = skeletons;
-				cv::imshow("image", cv_ptr->image);
+				// 显示当前所看到的图片
+				cv::imshow("image", image);
 				cv::waitKey(3);
+		}
+
+		// 检测姿态
+		SkeletonGesture checkSkeletonGesture(KinectSkeleton skeleton){
+				map<string, cv::Point2d> points2D = skeleton.points2D;					// 二维坐标点（图像上）
+				if(-points2D["left_hand_"].y > -points2D["torso_"].y){
+						return RAISELEFTHAND;
+				}
 		}
 
 		// 检测骨架是否处于静态状态
 		bool checkIsStatic(KinectSkeleton skeleton, list<KinectSkeleton> lastSkeletons){
 				list<KinectSkeleton>::iterator v;
 				for(v = lastSkeletons.begin(); v != lastSkeletons.end(); ++v){
+						int sum = 0;
 						KinectSkeleton s = *v;
-						cv::Point3d point = s.points3D["torso_"];
-						cv::Point3d lastPoint = skeleton.points3D["torso_"];
-						if(fabs(point.x - lastPoint.x) <= 0.000001 && fabs(point.y - lastPoint.y) <= 0.0000001 && fabs(point.z - lastPoint.z) <= 0.0000001){
+						for(int i = 0; i < 15; ++i){
+								cv::Point3d point = s.points3D[bodyStr[i]];
+								cv::Point3d lastPoint = skeleton.points3D[bodyStr[i]];
+								if(fabs(point.x - lastPoint.x) <= 0.000001 && fabs(point.y - lastPoint.y) <= 0.0000001 && fabs(point.z - lastPoint.z) <= 0.0000001){
+										sum++;
+								}
+						}
+						if(sum == 15){
 								return true;
 						}
+				}
+				return false;
+		}
+
+		// 判断是否是骨架 TF
+		bool checkTF(string str){
+				string body[] = {"head", "neck", "torso", "left_shoulder", "left_elbow", "left_hand", "right_shoulder", "right_elbow", "right_hand", "left_hip", "left_knee", "left_foot", "right_hip", "right_knee", "right_foot"};	
+				for(int k = 0; k < 15; ++k){
+						if (str.find(body[k]) != string::npos)
+								return true;
 				}
 				return false;
 		}
@@ -187,15 +268,6 @@ class KinectSkeletonVision
 				}
 		}
 
-		// 判断是否是骨架 TF
-		bool checkTF(string str){
-				string body[] = {"head", "neck", "torso", "left_shoulder", "left_elbow", "left_hand", "right_shoulder", "right_elbow", "right_hand", "left_hip", "left_knee", "left_foot", "right_hip", "right_knee", "right_foot"};	
-				for(int k = 0; k < 15; ++k){
-						if (str.find(body[k]) != string::npos)
-								return true;
-				}
-				return false;
-		}
 };
 
 int main(int argc, char **argv){
