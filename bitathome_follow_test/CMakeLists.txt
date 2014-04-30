@@ -110,6 +110,7 @@ include_directories(
 
 ## Declare a cpp executable
 # add_executable(bitathome_follow_test_node src/bitathome_follow_test_node.cpp)
+add_executable(test_1 src/test.cpp)
 add_executable(kinect_skeleton_vision src/KinectSkeletonVision.cpp)
 
 ## Add cmake target dependencies of the executable/library
@@ -120,6 +121,12 @@ add_executable(kinect_skeleton_vision src/KinectSkeletonVision.cpp)
 # target_link_libraries(bitathome_follow_test_node
 #   ${catkin_LIBRARIES}
 # )
+
+target_link_libraries(
+   test_1
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+)
 
 target_link_libraries(
    kinect_skeleton_vision
