@@ -6,6 +6,7 @@ project(bitathome_follow_test)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   image_geometry
+  cv_bridge
   image_transport
   roscpp
   rospy
