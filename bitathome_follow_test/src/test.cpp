@@ -17,6 +17,7 @@
 
 using namespace std;
 
+
 // 骨架视觉操作类
 class KinectSkeletonVision
 {
