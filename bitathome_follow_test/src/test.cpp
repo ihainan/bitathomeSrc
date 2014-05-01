@@ -51,6 +51,10 @@ class KinectSkeletonVision
         //语音输出
         ros::Publisher talkback_pub;
 
+        //wave gesture rec
+        WaveGestureTracker waveGesture;
+        float WAVE_THRESHOLD = 0.1f;
+
 		public :
 		// 构造函数
 		KinectSkeletonVision():it_(nh_){
@@ -420,7 +424,43 @@ class KinectSkeletonVision
                     points3D["right_hand_"].z - points3D["right_shoulder_"].z <-0.20)){
                     //cout << "PUSHHAND" <<endl;
                     return PUSHHAND;
-                    }
+                }
+                if( points3D["right_hand_"].y - points3D["right_elbow_"].y > 0.10){
+                	if(waveGesture.State == NONE_GESTURE){
+                        waveGesture.Reset();
+                		waveGesture.State = INPROGRESS;
+                		waveGesture.StartTime = ros::Time::now().toSec();
+                		if(points3D["right_hand_"].x - points3D["right_elbow_"].x >= 0.03){
+                            waveGesture.StartPosition = RIGHT;
+                		}
+                		else if(points3D["right_hand_"].x - points3D["right_elbow_"].x <= 0.03){
+                            waveGesture.StartPosition = LEFT;
+                		}
+                	}
+                	else{
+                        if(points3D["right_hand_"].x - points3D["right_elbow_"].x >= 0.03){
+                            waveGesture.CurrentPosition = RIGHT;
+                		}
+                		else if(points3D["right_hand_"].x - points3D["right_elbow_"].x <= 0.03){
+                            waveGesture.CurrentPosition = LEFT;
+                		}
+
+                		if(waveGesture.CurrentPosition != waveGesture.StartPosition){
+                            waveGesture.Count++;
+                            waveGesture.CurrentPosition = waveGesture.StartPosition;
+                		}
+                		if(waveGesture.Count >= 3){
+                            cout << "wave rec successful" << endl;
+                            waveGesture.State = SUCCESS;
+                            waveGesture.Reset();
+                		}
+                		double nowWaveTime = ros::Time::now().toSec();
+                		if(nowWaveTime - waveGesture.StartTime > 5){
+                            cout << "time out" << endl;
+                            waveGesture.Reset();
+                		}
+                	}
+                }
                 //cout << "NOGESTURE" <<endl;
 				return NOGESTURE;
 		}

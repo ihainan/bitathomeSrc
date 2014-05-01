@@ -31,6 +31,38 @@ enum SkeletonGesture{
 	STRETCH,                // 伸展
 };
 
+//wave hand posion
+enum WavePosition{
+	NONE_POSITION,
+	LEFT,
+	RIGHT,
+};
+
+enum WaveGestureState{
+	NONE_GESTURE,
+	SUCCESS,
+	FAILURE,
+	INPROGRESS,
+};
+
+struct WaveGestureTracker
+{
+    int Count;
+    WaveGestureState State = NONE_GESTURE;
+    double StartTime;
+    WavePosition StartPosition;
+    WavePosition CurrentPosition;
+
+    void Reset()
+    {
+        Count = 0;
+        State = NONE_GESTURE;
+        StartTime = 0;
+        StartPosition = NONE_POSITION;
+        CurrentPosition = NONE_POSITION;
+    }
+};
+
 // 骨架类
 class KinectSkeleton
 {
