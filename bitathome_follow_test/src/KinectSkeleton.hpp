@@ -27,6 +27,8 @@ enum SkeletonGesture{
 	NOGESTURE,				// 默认，无
 	RAISELEFTHAND,			// 举起左手
 	RAISERIGHTHAND,         // 举起右手
+	PUSHHAND,               // 推掌
+	STRETCH,                // 伸展
 };
 
 // 骨架类

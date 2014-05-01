@@ -44,6 +44,7 @@ class KinectSkeletonVision
         ros::ServiceClient client;
         bitathome_hardware_control::VectorMove srv;
         double currentTime;
+        double pauseTime;
         int staticCount[20];
 
 		public :
@@ -225,7 +226,16 @@ class KinectSkeletonVision
 												}
 
 												// 如果收到了暂停的手势，则暂停，计时
+												if(checkSkeletonGesture(s) == PUSHHAND) {
+                                                        pauseTime = ros::Time::now().toSec();
+                                                        this -> lockedUserState = PAUSE;
+												}
+
 												// 如果当前收到了识别的手势，则暂停，等待视野中出现两个人
+												if(checkSkeletonGesture(s) == STRETCH){
+                                                        this -> lockedUserState = REC;
+												}
+
 												// 如果收到了停止的手饰，则停止
 												if(checkSkeletonGesture(s) == RAISERIGHTHAND)
 												{
@@ -245,11 +255,17 @@ class KinectSkeletonVision
 
 										// 如果当前状态是暂停，则计算时间是否到达
 										if(this -> lockedUserState == PAUSE && lockUserID == s.userID){
+                                                double nowTime = ros::Time::now().toSec();
+                                                if(nowTime - pauseTime > 10)
+                                                {
+                                                    this ->lockedUserState = FOLLOWING;
+                                                }
 										}
 
 
 										// 如果当前状态是未锁定，且有人举手，则锁定，存储图像特征
-										if(this -> lockedUserState == UNLOCKED  && checkSkeletonGesture(s) == RAISELEFTHAND){
+										if(this -> lockedUserState == UNLOCKED  &&
+                                            checkSkeletonGesture(s) == RAISELEFTHAND){
 												lockUserID = s.userID;
 												this -> lockedUserState = FOLLOWING;
 												vision.newKinectVision(image, s);
@@ -295,12 +311,41 @@ class KinectSkeletonVision
 		// 检测姿态
 		SkeletonGesture checkSkeletonGesture(KinectSkeleton skeleton){
 				map<string, cv::Point3d> points3D = skeleton.points3D;					// 二维坐标点（图像上）
-				if(points3D["left_hand_"].y > points3D["left_shoulder_"].y){
+				if(points3D["left_hand_"].y - points3D["left_shoulder_"].y >0.20){
+                        cout << "RAISELEFTHAND"<<points3D["left_hand_"].y - points3D["left_shoulder_"].y <<endl;
  						return RAISELEFTHAND;
 				}
-				if(points3D["right_hand_"].y > points3D["right_shoulder_"].y){
+				if(points3D["right_hand_"].y - points3D["right_shoulder_"].y > 0.20){
+                        cout << "RAISERIGHTHAND" << points3D["right_hand_"].y - points3D["right_shoulder_"].y<<endl;
                         return RAISERIGHTHAND;
 				}
+				if (points3D["right_hand_"].y - points3D["left_hand_"].y < 0.10 &&
+                    points3D["right_hand_"].y - points3D["left_hand_"].y > -0.10 &&
+                    points3D["left_hand_"].y - points3D["left_shoulder_"].y <0.10 &&
+                    points3D["left_hand_"].y - points3D["left_shoulder_"].y >-0.10 &&
+                    points3D["right_hand_"].y - points3D["right_shoulder_"].y <0.10 &&
+                    points3D["right_hand_"].y - points3D["right_shoulder_"].y >-0.10 &&
+                    (points3D["left_hand_"].x - points3D["left_shoulder_"].x > 0.20 ||
+                    points3D["left_hand_"].x - points3D["left_shoulder_"].x < -0.20) &&
+                    (points3D["right_hand_"].x - points3D["right_shoulder_"].x >0.20 ||
+                    points3D["right_hand_"].x - points3D["right_shoulder_"].x <-0.20)){
+                    cout << "STRETCH" <<endl;
+                    return STRETCH;
+				}
+				if (points3D["right_hand_"].y - points3D["left_hand_"].y < 0.10 &&
+                    points3D["right_hand_"].y - points3D["left_hand_"].y > -0.10 &&
+                    points3D["left_hand_"].y - points3D["left_shoulder_"].y <0.10 &&
+                    points3D["left_hand_"].y - points3D["left_shoulder_"].y >-0.10 &&
+                    points3D["right_hand_"].y - points3D["right_shoulder_"].y <0.10 &&
+                    points3D["right_hand_"].y - points3D["right_shoulder_"].y >-0.10 &&
+                    (points3D["left_hand_"].z - points3D["left_shoulder_"].z > 0.20 ||
+                    points3D["left_hand_"].z - points3D["left_shoulder_"].z < -0.20) &&
+                    (points3D["right_hand_"].z - points3D["right_shoulder_"].z >0.20 ||
+                    points3D["right_hand_"].z - points3D["right_shoulder_"].z <-0.20)){
+                    cout << "PUSHHAND" <<endl;
+                    return PUSHHAND;
+                    }
+                cout << "NOGESTURE" <<endl;
 				return NOGESTURE;
 		}
 
