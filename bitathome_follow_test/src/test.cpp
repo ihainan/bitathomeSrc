@@ -229,18 +229,20 @@ class KinectSkeletonVision
 												if(checkSkeletonGesture(s) == PUSHHAND) {
                                                         pauseTime = ros::Time::now().toSec();
                                                         this -> lockedUserState = PAUSE;
+                                                        cout << "进入暂停状态" << endl;
 												}
 
 												// 如果当前收到了识别的手势，则暂停，等待视野中出现两个人
 												if(checkSkeletonGesture(s) == STRETCH){
                                                         this -> lockedUserState = REC;
+                                                        cout << "进入识别状态" << endl;
 												}
 
 												// 如果收到了停止的手饰，则停止
 												if(checkSkeletonGesture(s) == RAISERIGHTHAND)
 												{
                                                     this -> lockUserID = -1;
-                                                    this -> lockedUserState = REC;
+                                                    this -> lockedUserState = UNLOCKED;
                                                     cout << "不再锁定"<< endl;
 												}
 												// 设置速度，正常运动
@@ -259,6 +261,7 @@ class KinectSkeletonVision
                                                 if(nowTime - pauseTime > 10)
                                                 {
                                                     this ->lockedUserState = FOLLOWING;
+                                                    cout << "进入跟随状态" << endl;
                                                 }
 										}
 
@@ -281,6 +284,7 @@ class KinectSkeletonVision
 				                                                        		this -> lockedUserState = FOLLOWING;
 																				cout << confidence << endl;
 																				cout << "REC Successful!" << endl;
+																				cout << "进入跟随状态"<< endl;
 																		}
 																		else{
 																				cout << confidence << endl;
@@ -321,7 +325,7 @@ class KinectSkeletonVision
                 srv.request.vx = speed.vx;
                 srv.request.vy = speed.vy;
                 srv.request.omega = speed.w;
-                //client.call(srv);
+                client.call(srv);
                 //cout << speed.vx << " " << speed.vy << " " << speed.w << endl;
 
 				// 显示当前所看到的图片
@@ -345,11 +349,11 @@ class KinectSkeletonVision
 		SkeletonGesture checkSkeletonGesture(KinectSkeleton skeleton){
 				map<string, cv::Point3d> points3D = skeleton.points3D;					// 二维坐标点（图像上）
 				if(points3D["left_hand_"].y - points3D["left_shoulder_"].y >0.20){
-                        cout << "RAISELEFTHAND"<<points3D["left_hand_"].y - points3D["left_shoulder_"].y <<endl;
+                        //cout << "RAISELEFTHAND"<<points3D["left_hand_"].y - points3D["left_shoulder_"].y <<endl;
  						return RAISELEFTHAND;
 				}
 				if(points3D["right_hand_"].y - points3D["right_shoulder_"].y > 0.20){
-                        cout << "RAISERIGHTHAND" << points3D["right_hand_"].y - points3D["right_shoulder_"].y<<endl;
+                        //cout << "RAISERIGHTHAND" << points3D["right_hand_"].y - points3D["right_shoulder_"].y<<endl;
                         return RAISERIGHTHAND;
 				}
 				if (points3D["right_hand_"].y - points3D["left_hand_"].y < 0.10 &&
@@ -362,7 +366,7 @@ class KinectSkeletonVision
                     points3D["left_hand_"].x - points3D["left_shoulder_"].x < -0.20) &&
                     (points3D["right_hand_"].x - points3D["right_shoulder_"].x >0.20 ||
                     points3D["right_hand_"].x - points3D["right_shoulder_"].x <-0.20)){
-                    cout << "STRETCH" <<endl;
+                    //cout << "STRETCH" <<endl;
                     return STRETCH;
 				}
 				if (points3D["right_hand_"].y - points3D["left_hand_"].y < 0.10 &&
@@ -375,10 +379,10 @@ class KinectSkeletonVision
                     points3D["left_hand_"].z - points3D["left_shoulder_"].z < -0.20) &&
                     (points3D["right_hand_"].z - points3D["right_shoulder_"].z >0.20 ||
                     points3D["right_hand_"].z - points3D["right_shoulder_"].z <-0.20)){
-                    cout << "PUSHHAND" <<endl;
+                    //cout << "PUSHHAND" <<endl;
                     return PUSHHAND;
                     }
-                cout << "NOGESTURE" <<endl;
+                //cout << "NOGESTURE" <<endl;
 				return NOGESTURE;
 		}
 
