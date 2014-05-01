@@ -44,6 +44,7 @@ class KinectSkeletonVision
         ros::ServiceClient client;
         bitathome_hardware_control::VectorMove srv;
         double currentTime;
+        int staticCount[20];
 
 		public :
 		// 构造函数
@@ -138,11 +139,21 @@ class KinectSkeletonVision
 				for(list<KinectSkeleton>::iterator v = skeletons.begin(); v != skeletons.end(); ++v){
 						KinectSkeleton s = *v;
 						if(checkIsStatic(s, lastSkeletons)){
-								(*v).state = STATIC;
+								// (*v).state = STATIC;
+								// 计数
+								staticCount[s.userID]++;
 						}
+
 						else{
-								(*v).state = TRACKING;
+                                (*v).state = TRACKING;
+                                staticCount[s.userID] = 0;
 						}
+
+						if(staticCount[s.userID] > 2)
+						{
+                            (*v).state = STATIC;
+						}
+
 				}
 
 				// 做一些事情
@@ -166,7 +177,7 @@ class KinectSkeletonVision
 										// 骨架丢失
 										if(lockUserID == s.userID){
 												this -> lockedUserState = LOST;
-												cout << "跟踪丢失" << endl;
+												cout << "图片静态" << endl;
 										}
 								}
 								else{
@@ -174,14 +185,16 @@ class KinectSkeletonVision
 										cv::circle(image, s.points2D["torso_"], 3, CV_RGB(255,0,0), -1);
 										cv::circle(image, s.points2D["left_shoulder_"], 3, CV_RGB(255,0,0), -1);
 										cv::circle(image, s.points2D["right_shoulder_"], 3, CV_RGB(255,0,0), -1);
+										cv::circle(image, s.points2D["right_hand_"], 10, CV_RGB(255,0,0), -1);
+										cv::circle(image, s.points2D["left_hand_"], 10, CV_RGB(255,0,0), -1);
 
 										// 如果之前骨架丢失，判断当前所检测到的骨架是不是原来的锁定者
 										if(this -> lockedUserState == LOST){
 														cv::Mat currentUserImage = vision.getClipedImage(image, s);
-														if(currentUserImage.rows > 0){
+														if(currentUserImage.rows > 0 && currentUserImage.cols > 0){
 
 																double confidence = vision.getDifference(currentUserImage);
-																cout << "相似度：" << confidence << endl;
+																//cout << "相似度：" << confidence << endl;
 																if(confidence >= 90){
 																		this -> lockedUserState = FOLLOWING;
 																		this -> lockUserID = s.userID;
@@ -200,11 +213,12 @@ class KinectSkeletonVision
 												double nowTime = ros::Time::now().toSec();
 												if(nowTime - currentTime > 3){
                                                         // 获取图片，检测图片是否合格
-                                                        if(currentUserImage.rows > 0){
+                                                        if(currentUserImage.rows > 0 && currentUserImage.cols > 0){
                                                                 double confidence = vision.getDifference(currentUserImage);
                                                                 if(confidence >= 90){
 																		vision.newKinectVision(image, s);
 																		currentTime = ros::Time::now().toSec();
+																		cout << confidence << endl;
 																		cout << "更新图片" << endl;
 																}
                                                         }
@@ -217,6 +231,7 @@ class KinectSkeletonVision
 												{
                                                     this -> lockUserID = -1;
                                                     this -> lockedUserState = UNLOCKED;
+                                                    cout << "不再锁定"<< endl;
 												}
 												// 设置速度，正常运动
 												else
@@ -224,6 +239,8 @@ class KinectSkeletonVision
                                                     cv::Point3d points = s.points3D["torso_"];
                                                     speed = this -> GetMoveAction(points.x, points.y, points.z);
 												}
+												cv::imshow("KinectVision", vision.getImage());
+                                                cv::waitKey(3);
 										}
 
 										// 如果当前状态是暂停，则计算时间是否到达
@@ -238,6 +255,7 @@ class KinectSkeletonVision
 												vision.newKinectVision(image, s);
 												// 计时
 												currentTime =ros::Time::now().toSec();
+												cout << "我锁定你了"<< endl;
 										}
 								}
 						}
@@ -254,7 +272,7 @@ class KinectSkeletonVision
                 srv.request.vx = speed.vx;
                 srv.request.vy = speed.vy;
                 srv.request.omega = speed.w;
-                client.call(srv);
+                //client.call(srv);
                 //cout << speed.vx << " " << speed.vy << " " << speed.w << endl;
 
 				// 显示当前所看到的图片
@@ -276,11 +294,11 @@ class KinectSkeletonVision
 
 		// 检测姿态
 		SkeletonGesture checkSkeletonGesture(KinectSkeleton skeleton){
-				map<string, cv::Point2d> points2D = skeleton.points2D;					// 二维坐标点（图像上）
-				if(-points2D["left_hand_"].y > -points2D["torso_"].y){
-						return RAISELEFTHAND;
+				map<string, cv::Point3d> points3D = skeleton.points3D;					// 二维坐标点（图像上）
+				if(points3D["left_hand_"].y > points3D["left_shoulder_"].y){
+ 						return RAISELEFTHAND;
 				}
-				if(-points2D["right_hand_"].y > -points2D["torso_"].y){
+				if(points3D["right_hand_"].y > points3D["right_shoulder_"].y){
                         return RAISERIGHTHAND;
 				}
 				return NOGESTURE;

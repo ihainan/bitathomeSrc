@@ -12,7 +12,7 @@ using namespace std;
 class KinectVision
 {
 		public:
-				cv::Mat img;	
+				cv::Mat img;
 				double fingerPrint[4][8][8][8];
 
 				KinectVision(){
@@ -24,9 +24,9 @@ class KinectVision
 				}
 
 				void newKinectVision(cv::Mat image, KinectSkeleton skeleton){
-						cout << "newKinectVision : " << image.rows << endl;
+						// cout << "newKinectVision : " << image.rows << endl;
 						this ->img = getClipedImage(image, skeleton);
-						cout << "newKinectVision - img: " << this -> img.rows << endl;
+						// cout << "newKinectVision - img: " << this -> img.rows << endl;
 						getFingerPrint(img, fingerPrint);
 				}
 
@@ -49,7 +49,7 @@ class KinectVision
 						int height = 470 - y;
 
 						// 复制图像
-						if (!(x <= 0 || y <= 0 || x >= image.cols || y >= image.rows || x + width <= 0 || x + width > image.cols || y + height <= 0 || y + height > image.rows || height <= 0 || width <= 0))
+						if (!(width < 80 && x <= 0 || y <= 0 || x >= image.cols || y >= image.rows || x + width <= 0 || x + width > image.cols || y + height <= 0 || y + height > image.rows || height <= 0 || width <= 0))
 						{
 								cv::Rect roi(x, y, width, height);
 								cImage = image(roi);
@@ -71,11 +71,11 @@ class KinectVision
 												}
 										}
 								}
-						}	
+						}
 						int rows = aImg.rows;
 						int cols = aImg.cols;
 						int numOfPix[4] = { 0, 0, 0, 0 };
-						uchar* bgrData = aImg.data;		
+						uchar* bgrData = aImg.data;
 						for (int i = 0; i < rows / 2; i++)
 						{
 								uchar* ptr = (uchar*)(aImg.data + i * aImg.step);	//第row行数据的起始指针
@@ -168,8 +168,8 @@ class KinectVision
 				// 获取图像区别
 				double getDifference(cv::Mat aImage)
 				{
-						cout << "aImage : " << aImage.rows << ", " << aImage.cols << endl;
-						cout << "aImage : " << img.rows << ", " << img.cols << endl;
+						//cout << "aImage : " << aImage.rows << ", " << aImage.cols << endl;
+						//cout << "aImage : " << img.rows << ", " << img.cols << endl;
 						double result = 0;
 						double aFingerPrint[4][8][8][8];
 
@@ -203,7 +203,7 @@ class KinectVision
 										{
 												for (int k = 0; k < 8; k++)
 												{
-														if ((this -> fingerPrint[p][i][j][k] == 0) && (aFingerPrint[p][i][j][k] == 0)) 
+														if ((this -> fingerPrint[p][i][j][k] == 0) && (aFingerPrint[p][i][j][k] == 0))
 														{ }
 														else
 														{

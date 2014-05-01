@@ -111,6 +111,7 @@ include_directories(
 
 ## Declare a cpp executable
 # add_executable(bitathome_follow_test_node src/bitathome_follow_test_node.cpp)
+#add_executable(tony src/tony.cpp)
 add_executable(test_1 src/test.cpp)
 add_executable(kinect_skeleton_vision src/KinectSkeletonVision.cpp)
 
