@@ -230,7 +230,7 @@ class KinectSkeletonVision
 												if(checkSkeletonGesture(s) == RAISERIGHTHAND)
 												{
                                                     this -> lockUserID = -1;
-                                                    this -> lockedUserState = UNLOCKED;
+                                                    this -> lockedUserState = REC;
                                                     cout << "不再锁定"<< endl;
 												}
 												// 设置速度，正常运动
@@ -245,6 +245,39 @@ class KinectSkeletonVision
 
 										// 如果当前状态是暂停，则计算时间是否到达
 										if(this -> lockedUserState == PAUSE && lockUserID == s.userID){
+										}
+
+										// if now state is rec
+										if(this -> lockedUserState == REC && skeletons.size() >= 2){
+												int max_confidence = 0;
+												list<KinectSkeleton>::iterator vis;
+												for(vis = skeletons.begin(); vis != skeletons.end(); ++vis){
+														KinectSkeleton ks = *vis;
+														if(ks.state != STATIC){
+																// 获取图片
+																cv::Mat currentUserImage = vision.getClipedImage(image, ks);
+																// 检测图片是否合格
+				                                                if(currentUserImage.rows > 0 && currentUserImage.cols > 0){
+				                                                        double confidence = vision.getDifference(currentUserImage);
+				                                                        if(confidence >= 90 && confidence > max_confidence){
+																				//vision.newKinectVision(image, s);
+																				//currentTime = ros::Time::now().toSec();
+				                                                        		lockUserID = ks.userID;
+				                                                        		this -> lockedUserState = FOLLOWING;
+																				cout << confidence << endl;
+																				cout << "REC Successful!" << endl;
+																		}
+																		else{
+																				cout << confidence << endl;
+																				cout << "REC Failed!" << endl;
+																		}
+				                                                }
+														}
+												}
+												if(this -> lockedUserState == FOLLOWING){
+														cout << "lockUserID" << lockUserID << endl;
+												}
+												break;
 										}
 
 
