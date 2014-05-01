@@ -1,2 +1,4 @@
 openni_tracker
 skeleton_markers
+*.swp
+*.pyc
