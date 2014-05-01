@@ -16,7 +16,7 @@
 #include <list>
 
 #include <math.h>
-#include <std_msgs/String.h>
+#include "std_msgs/String.h"
 #include <sstream>
 #include "bitathome_hardware_control/VectorMove.h"
 
@@ -45,7 +45,11 @@ class KinectSkeletonVision
         bitathome_hardware_control::VectorMove srv;
         double currentTime;
         double pauseTime;
+        double lastTime;                            //识别状态上次语音提示时间
         int staticCount[20];
+
+        //语音输出
+        ros::Publisher talkback_pub;
 
 		public :
 		// 构造函数
@@ -55,6 +59,9 @@ class KinectSkeletonVision
 				lockUserID = -1;
                 //初始化监听
                 client = nh_.serviceClient<bitathome_hardware_control::VectorMove>("/hc_cmd_interface/vector_move");
+
+                //初始化发布语音消息
+                talkback_pub = nh_.advertise<std_msgs::String>("/follow_me/talk_back", 1000);
 
 				// 订阅图片主题
 				string image_topic = nh_.resolveName("/camera/rgb/image_color");
@@ -168,6 +175,8 @@ class KinectSkeletonVision
 		void doSomething(list<KinectSkeleton> skeletons, cv::Mat image){
 				// 监控拿到的骨架，进行状态转换
 				Velocity speed;
+                std_msgs::String msg;
+                std::stringstream ss;
 				if (!skeletons.empty()){
 						list<KinectSkeleton>::iterator v;
 						// 遍历骨架
@@ -200,6 +209,9 @@ class KinectSkeletonVision
 																		this -> lockedUserState = FOLLOWING;
 																		this -> lockUserID = s.userID;
 																		cout << "找回目标" << endl;
+                                                                        ss << "I find you again";
+                                                                        msg.data = ss.str();
+                                                                        talkback_pub.publish(msg);
 																}
 														}
 										}
@@ -230,12 +242,18 @@ class KinectSkeletonVision
                                                         pauseTime = ros::Time::now().toSec();
                                                         this -> lockedUserState = PAUSE;
                                                         cout << "进入暂停状态" << endl;
+                                                        ss << "OK,I will pause ten seconds"<< endl;
+                                                        msg.data = ss.str();
+                                                        talkback_pub.publish(msg);
 												}
 
 												// 如果当前收到了识别的手势，则暂停，等待视野中出现两个人
 												if(checkSkeletonGesture(s) == STRETCH){
                                                         this -> lockedUserState = REC;
                                                         cout << "进入识别状态" << endl;
+                                                        ss << "OK,I will wait for you"<< endl;
+                                                        msg.data = ss.str();
+                                                        talkback_pub.publish(msg);
 												}
 
 												// 如果收到了停止的手饰，则停止
@@ -244,6 +262,9 @@ class KinectSkeletonVision
                                                     this -> lockUserID = -1;
                                                     this -> lockedUserState = UNLOCKED;
                                                     cout << "不再锁定"<< endl;
+                                                    ss << "now, I stop"<< endl;
+                                                    msg.data = ss.str();
+                                                    talkback_pub.publish(msg);
 												}
 												// 设置速度，正常运动
 												else
@@ -262,6 +283,9 @@ class KinectSkeletonVision
                                                 {
                                                     this ->lockedUserState = FOLLOWING;
                                                     cout << "进入跟随状态" << endl;
+                                                    ss << "I will follow you" << endl;
+                                                    msg.data = ss.str();
+                                                    talkback_pub.publish(msg);
                                                 }
 										}
 
@@ -285,6 +309,9 @@ class KinectSkeletonVision
 																				cout << confidence << endl;
 																				cout << "REC Successful!" << endl;
 																				cout << "进入跟随状态"<< endl;
+																				ss << "I will follow you" << endl;
+                                                                                msg.data = ss.str();
+                                                                                talkback_pub.publish(msg);
 																		}
 																		else{
 																				cout << confidence << endl;
@@ -298,6 +325,15 @@ class KinectSkeletonVision
 												}
 												break;
 										}
+										else if(this -> lockedUserState == REC && skeletons.size() < 2){
+                                                double nowTime = ros::Time::now().toSec();
+                                                if(nowTime - lastTime > 15){
+                                                        ss << "Please stand one meter away, I can not see you" << endl;
+                                                        msg.data = ss.str();
+                                                        talkback_pub.publish(msg);
+                                                        lastTime = nowTime;
+                                                }
+										}
 
 
 										// 如果当前状态是未锁定，且有人举手，则锁定，存储图像特征
@@ -309,6 +345,9 @@ class KinectSkeletonVision
 												// 计时
 												currentTime =ros::Time::now().toSec();
 												cout << "我锁定你了"<< endl;
+												ss << "I will follow you" << endl;
+                                                msg.data = ss.str();
+                                                talkback_pub.publish(msg);
 										}
 								}
 						}
@@ -325,7 +364,7 @@ class KinectSkeletonVision
                 srv.request.vx = speed.vx;
                 srv.request.vy = speed.vy;
                 srv.request.omega = speed.w;
-                client.call(srv);
+                //client.call(srv);
                 //cout << speed.vx << " " << speed.vy << " " << speed.w << endl;
 
 				// 显示当前所看到的图片
