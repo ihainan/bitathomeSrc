@@ -49,7 +49,7 @@ class KinectVision
 						int height = 470 - y;
 
 						// 复制图像
-						if (!(width < 80 && x <= 0 || y <= 0 || x >= image.cols || y >= image.rows || x + width <= 0 || x + width > image.cols || y + height <= 0 || y + height > image.rows || height <= 0 || width <= 0))
+						if (!(width < 80 || x <= 0 || y <= 0 || x >= image.cols || y >= image.rows || x + width <= 0 || x + width > image.cols || y + height <= 0 || y + height > image.rows || height <= 0 || width <= 0))
 						{
 								cv::Rect roi(x, y, width, height);
 								cImage = image(roi);
@@ -172,6 +172,10 @@ class KinectVision
 						//cout << "aImage : " << img.rows << ", " << img.cols << endl;
 						double result = 0;
 						double aFingerPrint[4][8][8][8];
+
+						if(aImage.rows == 0 || aImage.cols == 0){
+								return 0.00;
+						}
 
 						// 获取指纹
 						getFingerPrint(aImage, aFingerPrint);
