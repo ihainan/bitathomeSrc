@@ -46,7 +46,7 @@ class KinectSkeletonVision
         double currentTime;                         //用于判断是否连续丢失
         double pauseTime;                           //暂停时间
         double lastTime;                            //识别状态上次语音提示时间
-        int staticCount[20];
+        int staticCount[20];                        //用于判断静止状态
 
         //语音输出
         ros::Publisher talkback_pub;
@@ -156,20 +156,25 @@ class KinectSkeletonVision
 				// 检测是否存在静态骨架
 				for(list<KinectSkeleton>::iterator v = skeletons.begin(); v != skeletons.end(); ++v){
 						KinectSkeleton s = *v;
-						if(checkIsStatic(s, lastSkeletons)){
-								// (*v).state = STATIC;
-								// 计数
-								staticCount[s.userID]++;
-						}
+						cv::Point3d points = s.points3D["torso_"];
+						if(points.z < 3.5){
+                                if (checkIsStatic(s, lastSkeletons)){
+                                        // (*v).state = STATIC;
+                                        // 计数
+                                        staticCount[s.userID]++;
+                                }
+                                else{
+                                        (*v).state = TRACKING;
+                                        staticCount[s.userID] = 0;
+                                }
 
+                                if(staticCount[s.userID] > 2)
+                                {
+                                    (*v).state = STATIC;
+                                }
+						}
 						else{
-                                (*v).state = TRACKING;
-                                staticCount[s.userID] = 0;
-						}
-
-						if(staticCount[s.userID] > 2)
-						{
-                            (*v).state = STATIC;
+                                (*v).state = INGORE;
 						}
 
 				}
@@ -192,12 +197,25 @@ class KinectSkeletonVision
 						// 遍历骨架
 						for(v = skeletons.begin(); v != skeletons.end(); ++v){
 								KinectSkeleton s = *v;
-								if(s.state == STATIC && this->lockedUserState == FOLLOWING){
+								if(s.state == INGORE && lockUserID != s.userID)
+								{
+                                    continue;
+								}
+								else if(s.state == INGORE && lockUserID == s.userID)
+								{
+                                        ss << "You are too far away from me"<< endl;
+                                        msg.data = ss.str();
+                                        talkback_pub.publish(msg);
+								}
+								else if(s.state == STATIC && this->lockedUserState == FOLLOWING){
 										// cout << "骨架" << s.userID << " 静止" << endl;
 										// 骨架丢失
 										if(lockUserID == s.userID){
 												this -> lockedUserState = LOST;
 												cout << "图片静态" << endl;
+												ss << "I lost you"<< endl;
+                                                msg.data = ss.str();
+                                                talkback_pub.publish(msg);
 										}
 								}
 								else{
@@ -258,16 +276,17 @@ class KinectSkeletonVision
 												}
 
 												// 如果当前收到了识别的手势，则暂停，等待视野中出现两个人
-												if(checkSkeletonGesture(s) == STRETCH){
+												else if(checkSkeletonGesture(s) == STRETCH){
                                                         this -> lockedUserState = REC;
                                                         cout << "进入识别状态" << endl;
-                                                        ss << "OK,I will wait for you"<< endl;
+                                                        ss << "OK,I will recognize you"<< endl;
                                                         msg.data = ss.str();
                                                         talkback_pub.publish(msg);
+                                                        lastTime = ros::Time::now().toSec();
 												}
 
 												// 如果收到了停止的手饰，则停止
-												if(checkSkeletonGesture(s) == RAISERIGHTHAND)
+												else if(checkSkeletonGesture(s) == RAISERIGHTHAND)
 												{
                                                     this -> lockUserID = -1;
                                                     this -> lockedUserState = UNLOCKED;
@@ -302,6 +321,7 @@ class KinectSkeletonVision
 										// if now state is rec
 										if(this -> lockedUserState == REC && skeletons.size() >= 2){
 												int max_confidence = 0;
+												lastTime = ros::Time::now().toSec();
 												list<KinectSkeleton>::iterator vis;
 												for(vis = skeletons.begin(); vis != skeletons.end(); ++vis){
 														KinectSkeleton ks = *vis;
@@ -316,32 +336,47 @@ class KinectSkeletonVision
 																				//currentTime = ros::Time::now().toSec();
 				                                                        		lockUserID = ks.userID;
 				                                                        		this -> lockedUserState = FOLLOWING;
-																				cout << confidence << endl;
-																				cout << "REC Successful!" << endl;
+																				//cout << confidence << endl;
+																				//cout << "REC Successful!" << endl;
 																				cout << "进入跟随状态"<< endl;
 																				ss << "I will follow you" << endl;
                                                                                 msg.data = ss.str();
                                                                                 talkback_pub.publish(msg);
 																		}
 																		else{
-																				cout << confidence << endl;
-																				cout << "REC Failed!" << endl;
+																				//cout << confidence << endl;
+																				//cout << "REC Failed!" << endl;
 																		}
 				                                                }
 														}
 												}
 												if(this -> lockedUserState == FOLLOWING){
-														cout << "lockUserID" << lockUserID << endl;
+														//cout << "lockUserID" << lockUserID << endl;
 												}
 												break;
 										}
 										else if(this -> lockedUserState == REC && skeletons.size() < 2){
                                                 double nowTime = ros::Time::now().toSec();
-                                                if(nowTime - lastTime > 15){
+                                                if(nowTime - lastTime > 12){
                                                         ss << "Please stand one meter away, I can not see you" << endl;
                                                         msg.data = ss.str();
                                                         talkback_pub.publish(msg);
                                                         lastTime = nowTime;
+                                                }
+                                                if(nowTime - lastTime < 3)
+                                                {
+                                                    speed.w = 10;
+                                                    cout << "左"<< endl;
+                                                }
+                                                else if(nowTime - lastTime < 9)
+                                                {
+                                                    speed.w = -10;
+                                                    cout << "右"<< endl;
+                                                }
+                                                else if(nowTime - lastTime < 12)
+                                                {
+                                                    speed.w = 10;
+                                                    cout << "左"<< endl;
                                                 }
 										}
 
@@ -359,12 +394,19 @@ class KinectSkeletonVision
                                                 msg.data = ss.str();
                                                 talkback_pub.publish(msg);
 										}
+										else if(this -> lockedUserState == UNLOCKED && skeletons.size() == 1)
+										{
+                                            cv::Point3d points = s.points3D["torso_"];
+                                            speed = this -> GetMoveAction(points.x, points.y, points.z);
+                                            speed.vx = 0;
+                                            speed.vy = 0;
+										}
 								}
 						}
 				}
 				else{
 						// 骨架丢失
-						if(lockUserID != -1){
+						if(lockUserID != -1 && this -> lockedUserState != REC){
 								this -> lockedUserState = LOST;
 								cout << "跟踪丢失" << endl;
 						}
@@ -386,7 +428,7 @@ class KinectSkeletonVision
         Velocity GetMoveAction(double x, double y, double z)
         {
             double s = sqrt(x*x + z*z);
-            double V = 600*(s-1);
+            double V = 600*(s-1.2);
             Velocity v;
             v.vx = z/s*V;
             v.vy = x/s*V;
