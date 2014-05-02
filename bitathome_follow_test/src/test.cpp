@@ -51,8 +51,9 @@ class KinectSkeletonVision
         //语音输出
         ros::Publisher talkback_pub;
 
-        //wave gesture rec
-        WaveGestureTracker waveGesture;
+        //挥动手势识别
+        WaveGestureTracker waveGesture;             //右手
+        WaveGestureTracker waveGesture_left;        //左手
         float WAVE_THRESHOLD = 0.1f;
 
 		public :
@@ -201,6 +202,8 @@ class KinectSkeletonVision
 										cv::circle(image, s.points2D["right_shoulder_"], 3, CV_RGB(255,0,0), -1);
 										cv::circle(image, s.points2D["right_hand_"], 10, CV_RGB(255,0,0), -1);
 										cv::circle(image, s.points2D["left_hand_"], 10, CV_RGB(255,0,0), -1);
+										cv::circle(image, s.points2D["right_elbow_"], 10, CV_RGB(255,0,0), -1);
+										cv::circle(image, s.points2D["left_elbow_"], 10, CV_RGB(255,0,0), -1);
 
 										// 如果之前骨架丢失，判断当前所检测到的骨架是不是原来的锁定者
 										if(this -> lockedUserState == LOST){
@@ -425,42 +428,91 @@ class KinectSkeletonVision
                     //cout << "PUSHHAND" <<endl;
                     return PUSHHAND;
                 }
+                // 挥右手手势识别，（相对机器而言）
                 if( points3D["right_hand_"].y - points3D["right_elbow_"].y > 0.10){
                 	if(waveGesture.State == NONE_GESTURE){
                         waveGesture.Reset();
-                		waveGesture.State = INPROGRESS;
-                		waveGesture.StartTime = ros::Time::now().toSec();
-                		if(points3D["right_hand_"].x - points3D["right_elbow_"].x >= 0.03){
+                		if(points3D["right_hand_"].x - points3D["right_elbow_"].x >= 0.10){
                             waveGesture.StartPosition = RIGHT;
+                            waveGesture.CurrentPosition = RIGHT;
+                            waveGesture.State = INPROGRESS;
+                            waveGesture.StartTime = ros::Time::now().toSec();
                 		}
-                		else if(points3D["right_hand_"].x - points3D["right_elbow_"].x <= 0.03){
+                		else if(points3D["right_hand_"].x - points3D["right_elbow_"].x <= 0.10){
                             waveGesture.StartPosition = LEFT;
+                            waveGesture.CurrentPosition = LEFT;
+                            waveGesture.State = INPROGRESS;
+                            waveGesture.StartTime = ros::Time::now().toSec();
                 		}
                 	}
                 	else{
-                        if(points3D["right_hand_"].x - points3D["right_elbow_"].x >= 0.03){
+                        if(points3D["right_hand_"].x - points3D["right_elbow_"].x >= 0.10){
                             waveGesture.CurrentPosition = RIGHT;
                 		}
-                		else if(points3D["right_hand_"].x - points3D["right_elbow_"].x <= 0.03){
+                		else if(points3D["right_hand_"].x - points3D["right_elbow_"].x <= 0.10){
                             waveGesture.CurrentPosition = LEFT;
                 		}
 
                 		if(waveGesture.CurrentPosition != waveGesture.StartPosition){
                             waveGesture.Count++;
-                            waveGesture.CurrentPosition = waveGesture.StartPosition;
+                            waveGesture.StartPosition = waveGesture.CurrentPosition;
                 		}
-                		if(waveGesture.Count >= 3){
-                            cout << "wave rec successful" << endl;
+                		if(waveGesture.Count >= 5){
+                            cout << "right wave rec successful" << endl;
                             waveGesture.State = SUCCESS;
                             waveGesture.Reset();
+                            return WAVE_RIGHT_HAND;
                 		}
                 		double nowWaveTime = ros::Time::now().toSec();
-                		if(nowWaveTime - waveGesture.StartTime > 5){
+                		if(nowWaveTime - waveGesture.StartTime >= 5){
                             cout << "time out" << endl;
                             waveGesture.Reset();
                 		}
                 	}
                 }
+                // 挥左手手势识别，（相对机器而言）
+                if( points3D["left_hand_"].y - points3D["left_elbow_"].y > 0.10){
+                	if(waveGesture_left.State == NONE_GESTURE){
+                        waveGesture_left.Reset();
+                		if(points3D["left_hand_"].x - points3D["left_elbow_"].x >= 0.10){
+                            waveGesture_left.StartPosition = RIGHT;
+                            waveGesture_left.CurrentPosition = RIGHT;
+                            waveGesture_left.State = INPROGRESS;
+                            waveGesture_left.StartTime = ros::Time::now().toSec();
+                		}
+                		else if(points3D["left_hand_"].x - points3D["left_elbow_"].x <= 0.10){
+                            waveGesture_left.StartPosition = LEFT;
+                            waveGesture_left.CurrentPosition = LEFT;
+                            waveGesture_left.State = INPROGRESS;
+                            waveGesture_left.StartTime = ros::Time::now().toSec();
+                		}
+                	}
+                	else{
+                        if(points3D["left_hand_"].x - points3D["left_elbow_"].x >= 0.10){
+                            waveGesture_left.CurrentPosition = RIGHT;
+                		}
+                		else if(points3D["left_hand_"].x - points3D["left_elbow_"].x <= 0.10){
+                            waveGesture_left.CurrentPosition = LEFT;
+                		}
+
+                		if(waveGesture_left.CurrentPosition != waveGesture_left.StartPosition){
+                            waveGesture_left.Count++;
+                            waveGesture_left.StartPosition = waveGesture_left.CurrentPosition;
+                		}
+                		if(waveGesture_left.Count >= 5){
+                            cout << "left wave rec successful" << endl;
+                            waveGesture_left.State = SUCCESS;
+                            waveGesture_left.Reset();
+                            return WAVE_LEFT_HAND;
+                		}
+                		double nowWaveTime = ros::Time::now().toSec();
+                		if(nowWaveTime - waveGesture_left.StartTime >= 5){
+                            cout << "time out" << endl;
+                            waveGesture_left.Reset();
+                		}
+                	}
+                }
+
                 //cout << "NOGESTURE" <<endl;
 				return NOGESTURE;
 		}
