@@ -176,6 +176,7 @@ class KinectSkeletonVision
 						}
 						else{
                                 (*v).state = INGORE;
+                                cout << "3.5" << endl;
 						}
 
 				}
@@ -269,7 +270,7 @@ class KinectSkeletonVision
 												}
 
 												// 如果收到了暂停的手势，则暂停，计时
-												if(checkSkeletonGesture(s) == PUSHHAND) {
+												if(checkSkeletonGesture(s) == RAISERIGHTHAND) {
                                                         pauseTime = ros::Time::now().toSec();
                                                         this -> lockedUserState = PAUSE;
                                                         cout << "进入暂停状态" << endl;
@@ -279,7 +280,7 @@ class KinectSkeletonVision
 												}
 
 												// 如果当前收到了识别的手势，则暂停，等待视野中出现两个人
-												else if(checkSkeletonGesture(s) == STRETCH){
+												else if(checkSkeletonGesture(s) == RAISELEFTHAND){
                                                         this -> lockedUserState = REC;
                                                         cout << "进入识别状态" << endl;
                                                         ss << "OK,I will recognize you"<< endl;
@@ -289,7 +290,7 @@ class KinectSkeletonVision
 												}
 
 												// 如果收到了停止的手饰，则停止
-												else if(checkSkeletonGesture(s) == RAISERIGHTHAND)
+												else if(checkSkeletonGesture(s) == PUSHHAND)
 												{
                                                     this -> lockUserID = -1;
                                                     this -> lockedUserState = UNLOCKED;
@@ -323,6 +324,7 @@ class KinectSkeletonVision
 
 										// if now state is rec
 										if(this -> lockedUserState == REC && skeletons.size() >= 2){
+                                                cout << " " << endl;
 												int max_confidence = 0;
 												lastTime = ros::Time::now().toSec();
 												list<KinectSkeleton>::iterator vis;
@@ -368,17 +370,17 @@ class KinectSkeletonVision
                                                 }
                                                 if(nowTime - lastTime < 3)
                                                 {
-                                                    speed.w = 10;
+                                                    speed.w = 50;
                                                     cout << "左"<< endl;
                                                 }
                                                 else if(nowTime - lastTime < 9)
                                                 {
-                                                    speed.w = -10;
+                                                    speed.w = -50;
                                                     cout << "右"<< endl;
                                                 }
                                                 else if(nowTime - lastTime < 12)
                                                 {
-                                                    speed.w = 10;
+                                                    speed.w = 50;
                                                     cout << "左"<< endl;
                                                 }
 										}
@@ -386,7 +388,7 @@ class KinectSkeletonVision
 
 										// 如果当前状态是未锁定，且有人举手，则锁定，存储图像特征
 										if(this -> lockedUserState == UNLOCKED  &&
-                                            checkSkeletonGesture(s) == RAISELEFTHAND){
+                                            checkSkeletonGesture(s) == WAVE_LEFT_HAND){
 												lockUserID = s.userID;
 												this -> lockedUserState = FOLLOWING;
 												vision.newKinectVision(image, s);
@@ -442,11 +444,13 @@ class KinectSkeletonVision
 		// 检测姿态
 		SkeletonGesture checkSkeletonGesture(KinectSkeleton skeleton){
 				map<string, cv::Point3d> points3D = skeleton.points3D;					// 二维坐标点（图像上）
-				if(points3D["left_hand_"].y - points3D["left_shoulder_"].y >0.20){
+				if(points3D["left_hand_"].y - points3D["left_shoulder_"].y >0.20 &&
+                    points3D["left_elbow_"].y - points3D["left_shoulder_"].y >0.05){
                         //cout << "RAISELEFTHAND"<<points3D["left_hand_"].y - points3D["left_shoulder_"].y <<endl;
  						return RAISELEFTHAND;
 				}
-				if(points3D["right_hand_"].y - points3D["right_shoulder_"].y > 0.20){
+				if(points3D["right_hand_"].y - points3D["right_shoulder_"].y > 0.20 &&
+                    points3D["right_elbow_"].y - points3D["right_shoulder_"].y >0.05){
                         //cout << "RAISERIGHTHAND" << points3D["right_hand_"].y - points3D["right_shoulder_"].y<<endl;
                         return RAISERIGHTHAND;
 				}
