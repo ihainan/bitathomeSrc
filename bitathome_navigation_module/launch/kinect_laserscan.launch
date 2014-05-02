@@ -3,6 +3,8 @@
 	<!-- include file = "$(find openni_launch)/launch/openni.launch"/ -->
 	<node pkg = "depthimage_to_laserscan" name = "depthimage_to_laserscan" type = "depthimage_to_laserscan">		
 		<remap from = "/image" to = "/camera/depth/image_raw"/>
+		<remap from = "/scan" to = "/scan_2"/>
+		
 		<remap from = "/camera_info" to = "/camera/depth/camera_info"/>
 		<param name="output_frame_id" value="/base_laser"/>
 		<param name="scan_time" value="1.0"/>

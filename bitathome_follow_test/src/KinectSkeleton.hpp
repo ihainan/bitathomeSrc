@@ -31,6 +31,8 @@ enum SkeletonGesture{
 	RAISERIGHTHAND,         // 举起右手
 	PUSHHAND,               // 推掌
 	STRETCH,                // 伸展
+	WAVE_RIGHT_HAND,        // 挥右手
+	WAVE_LEFT_HAND,         // 挥左手
 };
 
 //wave hand posion

@@ -13,6 +13,7 @@ from math import *
 from numpy import *
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TransformStamped
+from sensor_msgs.msg import LaserScan
 import tf
 import threading
 
@@ -39,6 +40,11 @@ th = 0.0
 vx = 0.0
 vy = 0.0
 vth = 0.0
+
+
+# 激光数据
+laserScan = LaserScan()
+scan_pub = rospy.Publisher("scan", LaserScan)
 
 # 广播相关
 odom_broadcaster = tf.TransformBroadcaster()
@@ -148,8 +154,9 @@ def cal_odom(vx, vy, omega, th, dt):
 def broadcast_odom():
 	global odom_broadcaster, odom_pub
 	global x, y, th, vx, vy, vth
+	global laserScan
 	rate = rospy.Rate(2)				# 降低更新频率，期待更好的性能
-
+	is_first = True;
 	while not rospy.is_shutdown():
 		# 发送 tf
 		ct = rospy.Time.now()			# 当前时间
@@ -171,8 +178,21 @@ def broadcast_odom():
 		odom.twist.twist.angular.z = vth;
 		odom_pub.publish(odom)
 
+
+		# 检测里程数据是否有更新
+		if is_first or abs(vx) > 0 or abs(vy) > 0 or abs(vth) > 0:
+			print "更新激光"
+			# 发送激光数据
+			scan_pub.publish(laserScan)	
+			if abs(vx) > 0 or abs(vy) > 0 or abs(vth) > 0:
+				is_first = False
+
 		# 休眠时间
 		rate.sleep()
+
+def handle_scan_data(data):
+	global laserScan
+	laserScan = data
 
 if __name__ == "__main__":
 	# 初始化节点
@@ -180,6 +200,7 @@ if __name__ == "__main__":
 
 	# 监听码盘数据，计算当前位置
 	rospy.Subscriber("/hc_cmd_interface/code_disk", CodeDisk, handle_codedisk_data)
+	rospy.Subscriber("/scan_2", LaserScan, handle_scan_data)
 
 	# 单开线程用于发布码盘数据
 	thread = threading.Thread(target = broadcast_odom)
