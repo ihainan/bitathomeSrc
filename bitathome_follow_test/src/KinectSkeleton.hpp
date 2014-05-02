@@ -20,6 +20,8 @@ enum SkeletonState{
 	NONE,					// 没有检测到骨架
 	STATIC,					// OpenNI Tracker 认为人没丢，但无法计算骨架位置
 	TRACKING,				// 正在被跟踪
+	INGORE,                 // 忽略3.5米以外的骨架
+	ABNORMAL,               // 异常骨架忽略(暂时设定为STATIC)
 };
 
 // 人体姿态
