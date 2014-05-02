@@ -12,7 +12,7 @@ import rospy
 from geometry_msgs.msg import *
 from bitathome_hardware_control.srv import *
 
-default_speed = 300					# 默认速度值，不宜太大
+default_speed = 80					# 默认速度值，不宜太大
 
 # 键盘监控循环
 def keyboard_loop():
@@ -51,9 +51,9 @@ def keyboard_loop():
 			# resp = ser(default_speed, -default_speed, 0)
 			# resp = ser(default_speed, default_speed, default_speed, 0, 0)
 		elif ch == "c":
-			resp = ser(0, 0, -500)
+			resp = ser(0, 0, -200)
 		elif ch == "z":
-			resp = ser(0, 0, 500)
+			resp = ser(0, 0, 200)
 		elif ch == "t":
 			resp = ser(default_speed, default_speed, -500)
 		elif ch == "x":

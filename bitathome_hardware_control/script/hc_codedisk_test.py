@@ -24,13 +24,15 @@ if __name__ == "__main__":
 	c = CodeDisk()
 	while not rospy.is_shutdown():
 		# 前进
-		m1 = m1 + 24557
+		'''
+		m1 = m1 + 200
 		if m1 > 4294967295:
 			m1 = 0
-		m2 = m2 - 24557
+		m2 = m2 - 200
 		if m2 < 0:
 			m2 = 4294967295
 		m3 = m3
+		'''
 		c.m1 = m1
 		c.m2 = m2
 		c.m3 = m3

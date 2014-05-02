@@ -44,7 +44,7 @@ vth = 0.0
 
 # 激光数据
 laserScan = LaserScan()
-scan_pub = rospy.Publisher("scan", LaserScan)
+# scan_pub = rospy.Publisher("scan", LaserScan)
 
 # 广播相关
 odom_broadcaster = tf.TransformBroadcaster()
@@ -131,6 +131,14 @@ def handle_codedisk_data(codedisk_data):
 
 # 里程数据计算
 def cal_odom(vx, vy, omega, th, dt):
+
+	vx_in_w = vx * cos(-th) - vy * sin(-th)
+	vy_in_w = vx * sin(-th) + vy * cos(-th)
+	dx = vx_in_w * dt
+	dy = vy_in_w * dt
+	dth = omega * dt
+	return (dy, -dy, dth)
+
 	# 无自旋的情况
 	if abs(omega) <= 0.1:
 		rospy.logerr("[info] : 角速度 %lf 变化小，认识是直线", omega / pi * 180)
@@ -155,8 +163,9 @@ def broadcast_odom():
 	global odom_broadcaster, odom_pub
 	global x, y, th, vx, vy, vth
 	global laserScan
-	rate = rospy.Rate(2)				# 降低更新频率，期待更好的性能
+	rate = rospy.Rate(20)				# 降低更新频率，期待更好的性能
 	is_first = True;
+	last_odom = None
 	while not rospy.is_shutdown():
 		# 发送 tf
 		ct = rospy.Time.now()			# 当前时间
@@ -180,19 +189,39 @@ def broadcast_odom():
 
 
 		# 检测里程数据是否有更新
-		if is_first or abs(vx) > 0 or abs(vy) > 0 or abs(vth) > 0:
-			print "更新激光"
+		'''
+		if is_first or check_odom_update(odom, last_odom):
+			rospy.logerr("更新激光：%lf %lf %lf", vx, vy, vth)
 			# 发送激光数据
 			scan_pub.publish(laserScan)	
-			if abs(vx) > 0 or abs(vy) > 0 or abs(vth) > 0:
+			if check_odom_update(odom, last_odom):
 				is_first = False
+		'''
+		#scan_pub.publish(laserScan)	
 
 		# 休眠时间
+		last_odom = odom
 		rate.sleep()
 
+# 检查里程是否有更新
+def check_odom_update(odom, last_odom):
+	if last_odom == None:
+			return False
+	x1 = odom.pose.pose.position.x
+	y1 = odom.pose.pose.position.y
+	z1 = odom.pose.pose.position.z
+	x2 = last_odom.pose.pose.position.x
+	y2 = last_odom.pose.pose.position.y
+	z2 = last_odom.pose.pose.position.z
+	if abs(x1 - x2) > 0 or abs(y1 - y2) > 0 or abs(z1 - z2) > 0:
+			return True
+	return False
+
+'''
 def handle_scan_data(data):
 	global laserScan
 	laserScan = data
+'''
 
 if __name__ == "__main__":
 	# 初始化节点
@@ -200,7 +229,7 @@ if __name__ == "__main__":
 
 	# 监听码盘数据，计算当前位置
 	rospy.Subscriber("/hc_cmd_interface/code_disk", CodeDisk, handle_codedisk_data)
-	rospy.Subscriber("/scan_2", LaserScan, handle_scan_data)
+	# rospy.Subscriber("/scan_2", LaserScan, handle_scan_data)
 
 	# 单开线程用于发布码盘数据
 	thread = threading.Thread(target = broadcast_odom)
