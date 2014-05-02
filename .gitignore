@@ -2,3 +2,8 @@ openni_tracker
 skeleton_markers
 *.swp
 *.pyc
+
+.idea/*
+
+CMakeLists.txt
+
