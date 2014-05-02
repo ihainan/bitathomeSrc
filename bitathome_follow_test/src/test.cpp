@@ -43,8 +43,8 @@ class KinectSkeletonVision
         // 运动相关
         ros::ServiceClient client;
         bitathome_hardware_control::VectorMove srv;
-        double currentTime;
-        double pauseTime;
+        double currentTime;                         //用于判断是否连续丢失
+        double pauseTime;                           //暂停时间
         double lastTime;                            //识别状态上次语音提示时间
         int staticCount[20];
 
@@ -71,6 +71,12 @@ class KinectSkeletonVision
 				// 订阅图片主题
 				string image_topic = nh_.resolveName("/camera/rgb/image_color");
 				sub_ = it_.subscribeCamera(image_topic, 1, &KinectSkeletonVision::imageCb, this);
+
+                std_msgs::String msg;
+                std::stringstream ss;
+                ss << "Please raise your left hand to start follow me, and raise your right hand to stop"<< endl;
+                msg.data = ss.str();
+                talkback_pub.publish(msg);
 		}
 
 		// 每收到一张图像
@@ -187,7 +193,7 @@ class KinectSkeletonVision
 						// 遍历骨架
 						for(v = skeletons.begin(); v != skeletons.end(); ++v){
 								KinectSkeleton s = *v;
-								if(s.state == STATIC){
+								if(s.state == STATIC && this->lockedUserState == FOLLOWING){
 										// cout << "骨架" << s.userID << " 静止" << endl;
 										// 骨架丢失
 										if(lockUserID == s.userID){
@@ -216,7 +222,7 @@ class KinectSkeletonVision
 																		this -> lockedUserState = FOLLOWING;
 																		this -> lockUserID = s.userID;
 																		cout << "找回目标" << endl;
-                                                                        ss << "I find you again";
+                                                                        ss << "I find you again"<< endl;
                                                                         msg.data = ss.str();
                                                                         talkback_pub.publish(msg);
 																}

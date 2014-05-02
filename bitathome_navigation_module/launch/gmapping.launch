@@ -1,5 +1,5 @@
 <launch>
-<!-- include file = "$(find bitathome_navigation_module)/launch/navigation_configuration.launch"/-->
+<include file = "$(find bitathome_navigation_module)/launch/navigation_configuration.launch"/>
 <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
 		<param name = "odom_frame" value = "odom"/>
 		<param name = "scan" value = "scan"/>
