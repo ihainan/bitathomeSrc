@@ -71,6 +71,8 @@ class KinectSkeletonVision
 				string image_topic = nh_.resolveName("/camera/rgb/image_color");
 				sub_ = it_.subscribeCamera(image_topic, 1, &KinectSkeletonVision::imageCb, this);
 
+                std_msgs::String msg;
+                std::stringstream ss;
                 ss << "Please raise your left hand to start follow me, and raise your right hand to stop"<< endl;
                 msg.data = ss.str();
                 talkback_pub.publish(msg);
@@ -190,7 +192,7 @@ class KinectSkeletonVision
 						// 遍历骨架
 						for(v = skeletons.begin(); v != skeletons.end(); ++v){
 								KinectSkeleton s = *v;
-								if(s.state == STATIC){
+								if(s.state == STATIC && this->lockedUserState == FOLLOWING){
 										// cout << "骨架" << s.userID << " 静止" << endl;
 										// 骨架丢失
 										if(lockUserID == s.userID){
