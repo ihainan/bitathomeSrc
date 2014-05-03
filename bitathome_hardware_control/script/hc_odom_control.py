@@ -131,13 +131,12 @@ def handle_codedisk_data(codedisk_data):
 
 # 里程数据计算
 def cal_odom(vx, vy, omega, th, dt):
-
 	vx_in_w = vx * cos(-th) - vy * sin(-th)
 	vy_in_w = vx * sin(-th) + vy * cos(-th)
 	dx = vx_in_w * dt
 	dy = vy_in_w * dt
 	dth = omega * dt
-	return (dy, -dy, dth)
+	return (dx, dy, dth)
 
 	# 无自旋的情况
 	if abs(omega) <= 0.1:
