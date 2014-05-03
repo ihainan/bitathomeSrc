@@ -137,7 +137,7 @@ def cal_odom(vx, vy, omega, th, dt):
 	dx = vx_in_w * dt
 	dy = vy_in_w * dt
 	dth = omega * dt
-	return (dy, -dy, dth)
+	return (dx, dy, dth)
 
 	# 无自旋的情况
 	if abs(omega) <= 0.1:
@@ -157,7 +157,7 @@ def cal_odom(vx, vy, omega, th, dt):
 		dth = omega * dt
 		dx = r * sin(-(dth + th)) - r * sin(-(th))
 		dy = r * cos(-th) - r * cos(-(dth + th))
-		return (dy, -dy, dth)
+		return (dx, dy, dth)
 
 def broadcast_odom():
 	global odom_broadcaster, odom_pub
