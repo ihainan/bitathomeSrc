@@ -21,7 +21,7 @@ node_name = "hc_cmd_interface"							# 节点名字
 vsp = VoySerialPort("/dev/ttyUSB0", 2000000, 8)			# 串口通信对象
 # delayTime_of_code_disk = 100							# 获取码盘数据间隔时间
 delayTime_of_code_disk = 50							# 获取码盘数据间隔时间
-max_speed = 800											# 最大速度
+max_speed = 1800											# 最大速度
 radius_of_base = 0.44724 / 2							# 轮子到中心的距离
 
 # 数学相关
