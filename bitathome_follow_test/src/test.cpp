@@ -47,6 +47,7 @@ class KinectSkeletonVision
         double pauseTime;                           //暂停时间
         double lastTime;                            //识别状态上次语音提示时间
         int staticCount[20];                        //用于判断静止状态
+        double mindistance = 1.2;
 
         //语音输出
         ros::Publisher talkback_pub;
@@ -55,6 +56,8 @@ class KinectSkeletonVision
         WaveGestureTracker waveGesture;             //右手
         WaveGestureTracker waveGesture_left;        //左手
         float WAVE_THRESHOLD = 0.1f;
+        int RAISELEFTHANDTIME = 0;
+        int RAISERIGHTHANDTIME = 0;
 
 		public :
 		// 构造函数
@@ -75,6 +78,7 @@ class KinectSkeletonVision
                 std_msgs::String msg;
                 std::stringstream ss;
                 ss << "Please raise your left hand to start follow me, and raise your right hand to stop"<< endl;
+                //ss << "程序已启动，用右手向我招手让我跟随你，请在跟随状态下举起右手让我停止，请在跟随状态下举起左手让我识别。" << endl;
                 msg.data = ss.str();
                 talkback_pub.publish(msg);
 		}
@@ -101,7 +105,6 @@ class KinectSkeletonVision
 				tf::StampedTransform transform;
 				ros::Time acquisition_time = info_msg -> header.stamp;
 				ros::Duration timeout(1.0 / 10);
-
 				// 获取当前所有的帧
 				vector<string> frame_ids;
 				tf_listener_.getFrameStrings(frame_ids);
@@ -158,7 +161,7 @@ class KinectSkeletonVision
 				for(list<KinectSkeleton>::iterator v = skeletons.begin(); v != skeletons.end(); ++v){
 						KinectSkeleton s = *v;
 						cv::Point3d points = s.points3D["torso_"];
-						if(points.z < 3.5){
+						if(points.z < 6){
                                 if (checkIsStatic(s, lastSkeletons)){
                                         // (*v).state = STATIC;
                                         // 计数
@@ -176,7 +179,7 @@ class KinectSkeletonVision
 						}
 						else{
                                 (*v).state = INGORE;
-                                cout << "3.5" << endl;
+                                //cout << "3.5" << endl;
 						}
 
 				}
@@ -199,6 +202,7 @@ class KinectSkeletonVision
 						// 遍历骨架
 						for(v = skeletons.begin(); v != skeletons.end(); ++v){
 								KinectSkeleton s = *v;
+								SkeletonGesture Gesture = checkSkeletonGesture(s);
 								if(s.state == INGORE && lockUserID != s.userID)
 								{
                                     continue;
@@ -220,6 +224,13 @@ class KinectSkeletonVision
                                                 talkback_pub.publish(msg);
 										}
 								}
+								/*else if(s.state == STATIC && this->lockedUserState == PASS){
+                                        if(lockUserID == s.userID){
+                                                this -> lockedUserState = LOST;
+
+                                        }
+
+								}*/
 								else{
 										// 在图像中显示骨架
 										cv::circle(image, s.points2D["torso_"], 3, CV_RGB(255,0,0), -1);
@@ -236,12 +247,13 @@ class KinectSkeletonVision
 														if(currentUserImage.rows > 0 && currentUserImage.cols > 0){
 
 																double confidence = vision.getDifference(currentUserImage);
-																//cout << "相似度：" << confidence << endl;
-																if(confidence >= 90){
+																cout << "相似度：" << confidence << endl;
+																if(confidence >= 75){
 																		this -> lockedUserState = FOLLOWING;
 																		this -> lockUserID = s.userID;
 																		cout << "找回目标" << endl;
                                                                         ss << "I find you again"<< endl;
+                                                                        //ss << "找回目标"<< endl;
                                                                         msg.data = ss.str();
                                                                         talkback_pub.publish(msg);
 																}
@@ -253,6 +265,7 @@ class KinectSkeletonVision
 										if(this -> lockedUserState == FOLLOWING && lockUserID == s.userID){
 												// 更新图像
 												cv::Mat currentUserImage = vision.getClipedImage(image, s);
+
 
 												// 检查是否到时间，是的话更新图片
 												double nowTime = ros::Time::now().toSec();
@@ -270,34 +283,50 @@ class KinectSkeletonVision
 												}
 
 												// 如果收到了暂停的手势，则暂停，计时
-												if(checkSkeletonGesture(s) == RAISERIGHTHAND) {
+												if(Gesture == RAISERIGHTHAND) {
                                                         pauseTime = ros::Time::now().toSec();
                                                         this -> lockedUserState = PAUSE;
                                                         cout << "进入暂停状态" << endl;
                                                         ss << "OK,I will pause ten seconds"<< endl;
+                                                        //ss << "进入暂停状态"<< endl;
                                                         msg.data = ss.str();
                                                         talkback_pub.publish(msg);
+                                                        mindistance = 0.7;
 												}
 
 												// 如果当前收到了识别的手势，则暂停，等待视野中出现两个人
-												else if(checkSkeletonGesture(s) == RAISELEFTHAND){
+												else if(Gesture == NOUSE){
                                                         this -> lockedUserState = REC;
                                                         cout << "进入识别状态" << endl;
                                                         ss << "OK,I will recognize you"<< endl;
+                                                        //ss << "进入识别状态"<< endl;
                                                         msg.data = ss.str();
                                                         talkback_pub.publish(msg);
                                                         lastTime = ros::Time::now().toSec();
 												}
 
 												// 如果收到了停止的手饰，则停止
-												else if(checkSkeletonGesture(s) == PUSHHAND)
+												else if(Gesture == RAISELEFTHAND)
 												{
                                                     this -> lockUserID = -1;
                                                     this -> lockedUserState = UNLOCKED;
                                                     cout << "不再锁定"<< endl;
                                                     ss << "now, I stop"<< endl;
+                                                    //ss << "不再锁定"<< endl;
                                                     msg.data = ss.str();
                                                     talkback_pub.publish(msg);
+												}
+												// 如果收到了干扰手势，就进入干扰状态
+												else if(Gesture == WAVE_RIGHT_HAND)
+												{
+                                                    this -> lockUserID = -1;
+                                                    this -> lockedUserState = PASS;
+                                                    cout << "等待穿过"<< endl;
+                                                    ss << "wait people pass"<< endl;
+                                                    //ss << "不再锁定"<< endl;
+                                                    msg.data = ss.str();
+                                                    talkback_pub.publish(msg);
+                                                    pauseTime = ros::Time::now().toSec();
 												}
 												// 设置速度，正常运动
 												else
@@ -317,12 +346,27 @@ class KinectSkeletonVision
                                                     this ->lockedUserState = FOLLOWING;
                                                     cout << "进入跟随状态" << endl;
                                                     ss << "I will follow you" << endl;
+                                                    //ss << "进入跟随状态" << endl;
                                                     msg.data = ss.str();
                                                     talkback_pub.publish(msg);
                                                 }
 										}
 
-										// if now state is rec
+										if(this -> lockedUserState == PASS)
+										{
+                                                double nowTime = ros::Time::now().toSec();
+                                                if(nowTime - pauseTime > 6)
+                                                {
+                                                    this ->lockedUserState = LOST;
+                                                    cout << "进入跟随状态" << endl;
+                                                    ss << "I will follow you" << endl;
+                                                    //ss << "进入跟随状态" << endl;
+                                                    msg.data = ss.str();
+                                                    talkback_pub.publish(msg);
+                                                }
+										}
+
+										// if now state is rec 如果当前状态是识别
 										if(this -> lockedUserState == REC && skeletons.size() >= 2){
                                                 cout << " " << endl;
 												int max_confidence = 0;
@@ -345,6 +389,7 @@ class KinectSkeletonVision
 																				//cout << "REC Successful!" << endl;
 																				cout << "进入跟随状态"<< endl;
 																				ss << "I will follow you" << endl;
+																				//ss << "进入跟随状态" << endl;
                                                                                 msg.data = ss.str();
                                                                                 talkback_pub.publish(msg);
 																		}
@@ -364,6 +409,7 @@ class KinectSkeletonVision
                                                 double nowTime = ros::Time::now().toSec();
                                                 if(nowTime - lastTime > 12){
                                                         ss << "Please stand one meter away, I can not see you" << endl;
+                                                        //ss << "我看不见你" << endl;
                                                         msg.data = ss.str();
                                                         talkback_pub.publish(msg);
                                                         lastTime = nowTime;
@@ -371,33 +417,35 @@ class KinectSkeletonVision
                                                 if(nowTime - lastTime < 3)
                                                 {
                                                     speed.w = 50;
-                                                    cout << "左"<< endl;
+                                                    //cout << "左"<< endl;
                                                 }
                                                 else if(nowTime - lastTime < 9)
                                                 {
                                                     speed.w = -50;
-                                                    cout << "右"<< endl;
+                                                    //cout << "右"<< endl;
                                                 }
                                                 else if(nowTime - lastTime < 12)
                                                 {
                                                     speed.w = 50;
-                                                    cout << "左"<< endl;
+                                                    //cout << "左"<< endl;
                                                 }
 										}
 
 
 										// 如果当前状态是未锁定，且有人举手，则锁定，存储图像特征
 										if(this -> lockedUserState == UNLOCKED  &&
-                                            checkSkeletonGesture(s) == WAVE_LEFT_HAND){
-												lockUserID = s.userID;
-												this -> lockedUserState = FOLLOWING;
-												vision.newKinectVision(image, s);
-												// 计时
-												currentTime =ros::Time::now().toSec();
-												cout << "我锁定你了"<< endl;
-												ss << "I will follow you" << endl;
-                                                msg.data = ss.str();
-                                                talkback_pub.publish(msg);
+                                            Gesture == WAVE_LEFT_HAND){
+                                                if(vision.getClipedImage(image, s).rows > 0){
+                                                    vision.newKinectVision(image, s);
+                                                    lockUserID = s.userID;
+                                                    this -> lockedUserState = FOLLOWING;
+                                                    // 计时
+                                                    currentTime =ros::Time::now().toSec();
+                                                    cout << "我锁定你了"<< endl;
+                                                    ss << "I will follow you" << endl;
+                                                    msg.data = ss.str();
+                                                    talkback_pub.publish(msg);
+                                                }
 										}
 										else if(this -> lockedUserState == UNLOCKED && skeletons.size() == 1)
 										{
@@ -405,6 +453,7 @@ class KinectSkeletonVision
                                             speed = this -> GetMoveAction(points.x, points.y, points.z);
                                             speed.vx = 0;
                                             speed.vy = 0;
+                                            speed.w = 0;
 										}
 								}
 						}
@@ -421,7 +470,7 @@ class KinectSkeletonVision
                 srv.request.vx = speed.vx;
                 srv.request.vy = speed.vy;
                 srv.request.omega = speed.w;
-                //client.call(srv);
+                client.call(srv);
                 //cout << speed.vx << " " << speed.vy << " " << speed.w << endl;
 
 				// 显示当前所看到的图片
@@ -433,26 +482,45 @@ class KinectSkeletonVision
         Velocity GetMoveAction(double x, double y, double z)
         {
             double s = sqrt(x*x + z*z);
-            double V = 600*(s-1.2);
+            double V = 900*(s-mindistance);
             Velocity v;
+            if (V > 800)
+            {
+                V = 800;
+            }
             v.vx = z/s*V;
             v.vy = x/s*V;
-            v.w = 800*x/s;
+            v.w = 40    00*asin(x/s)/3.1415926*2;
+            //cout << x << " "<< s << " " << v.w << endl;
             return v;
         }
 
 		// 检测姿态
 		SkeletonGesture checkSkeletonGesture(KinectSkeleton skeleton){
 				map<string, cv::Point3d> points3D = skeleton.points3D;					// 二维坐标点（图像上）
-				if(points3D["left_hand_"].y - points3D["left_shoulder_"].y >0.20 &&
-                    points3D["left_elbow_"].y - points3D["left_shoulder_"].y >0.05){
+				//if(points3D["left_hand_"].y - points3D["left_shoulder_"].y >0.20 &&
+                if(points3D["left_elbow_"].y - points3D["left_shoulder_"].y >0.10){
                         //cout << "RAISELEFTHAND"<<points3D["left_hand_"].y - points3D["left_shoulder_"].y <<endl;
- 						return RAISELEFTHAND;
+                        RAISELEFTHANDTIME ++;
+                        if(RAISELEFTHANDTIME > 5)
+                        {
+                            return RAISELEFTHAND;
+ 						}
+ 						else{
+                            return NOGESTURE;
+ 						}
 				}
-				if(points3D["right_hand_"].y - points3D["right_shoulder_"].y > 0.20 &&
-                    points3D["right_elbow_"].y - points3D["right_shoulder_"].y >0.05){
+				//if(points3D["right_hand_"].y - points3D["right_shoulder_"].y > 0.20 &&
+                if(points3D["right_elbow_"].y - points3D["right_shoulder_"].y >0.10){
                         //cout << "RAISERIGHTHAND" << points3D["right_hand_"].y - points3D["right_shoulder_"].y<<endl;
-                        return RAISERIGHTHAND;
+                        RAISERIGHTHANDTIME ++;
+                        if(RAISERIGHTHANDTIME > 5)
+                        {
+                            return RAISERIGHTHAND;
+ 						}
+ 						else{
+                            return NOGESTURE;
+ 						}
 				}
 				if (points3D["right_hand_"].y - points3D["left_hand_"].y < 0.10 &&
                     points3D["right_hand_"].y - points3D["left_hand_"].y > -0.10 &&
@@ -480,6 +548,7 @@ class KinectSkeletonVision
                     //cout << "PUSHHAND" <<endl;
                     return PUSHHAND;
                 }
+
                 // 挥右手手势识别，（相对机器而言）
                 if( points3D["right_hand_"].y - points3D["right_elbow_"].y > 0.10){
                 	if(waveGesture.State == NONE_GESTURE){
@@ -509,7 +578,7 @@ class KinectSkeletonVision
                             waveGesture.Count++;
                             waveGesture.StartPosition = waveGesture.CurrentPosition;
                 		}
-                		if(waveGesture.Count >= 5){
+                		if(waveGesture.Count >= 4){
                             cout << "right wave rec successful" << endl;
                             waveGesture.State = SUCCESS;
                             waveGesture.Reset();
@@ -522,17 +591,18 @@ class KinectSkeletonVision
                 		}
                 	}
                 }
+
                 // 挥左手手势识别，（相对机器而言）
-                if( points3D["left_hand_"].y - points3D["left_elbow_"].y > 0.10){
+                if( points3D["left_hand_"].y - points3D["left_elbow_"].y > 0.08){
                 	if(waveGesture_left.State == NONE_GESTURE){
                         waveGesture_left.Reset();
-                		if(points3D["left_hand_"].x - points3D["left_elbow_"].x >= 0.10){
+                		if(points3D["left_hand_"].x - points3D["left_elbow_"].x >= 0.08){
                             waveGesture_left.StartPosition = RIGHT;
                             waveGesture_left.CurrentPosition = RIGHT;
                             waveGesture_left.State = INPROGRESS;
                             waveGesture_left.StartTime = ros::Time::now().toSec();
                 		}
-                		else if(points3D["left_hand_"].x - points3D["left_elbow_"].x <= 0.10){
+                		else if(points3D["left_hand_"].x - points3D["left_elbow_"].x <= 0.08){
                             waveGesture_left.StartPosition = LEFT;
                             waveGesture_left.CurrentPosition = LEFT;
                             waveGesture_left.State = INPROGRESS;
@@ -540,10 +610,10 @@ class KinectSkeletonVision
                 		}
                 	}
                 	else{
-                        if(points3D["left_hand_"].x - points3D["left_elbow_"].x >= 0.10){
+                        if(points3D["left_hand_"].x - points3D["left_elbow_"].x >= 0.08){
                             waveGesture_left.CurrentPosition = RIGHT;
                 		}
-                		else if(points3D["left_hand_"].x - points3D["left_elbow_"].x <= 0.10){
+                		else if(points3D["left_hand_"].x - points3D["left_elbow_"].x <= 0.08){
                             waveGesture_left.CurrentPosition = LEFT;
                 		}
 
@@ -551,7 +621,7 @@ class KinectSkeletonVision
                             waveGesture_left.Count++;
                             waveGesture_left.StartPosition = waveGesture_left.CurrentPosition;
                 		}
-                		if(waveGesture_left.Count >= 5){
+                		if(waveGesture_left.Count >= 4){
                             cout << "left wave rec successful" << endl;
                             waveGesture_left.State = SUCCESS;
                             waveGesture_left.Reset();
@@ -566,6 +636,8 @@ class KinectSkeletonVision
                 }
 
                 //cout << "NOGESTURE" <<endl;
+                RAISELEFTHANDTIME = 0;
+                RAISERIGHTHANDTIME = 0;
 				return NOGESTURE;
 		}
 

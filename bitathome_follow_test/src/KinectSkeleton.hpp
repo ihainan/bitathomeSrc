@@ -13,6 +13,7 @@ enum LockedUserState{
 	LOST,				// 已经丢失
 	PAUSE,				// 暂停状态
 	REC,				// 识别状态
+	PASS,               // 穿过状态
 };
 
 // 骨架状态枚举
@@ -33,6 +34,7 @@ enum SkeletonGesture{
 	STRETCH,                // 伸展
 	WAVE_RIGHT_HAND,        // 挥右手
 	WAVE_LEFT_HAND,         // 挥左手
+	NOUSE,                  // 没有作用的判断用这个防止bug
 };
 
 //wave hand posion

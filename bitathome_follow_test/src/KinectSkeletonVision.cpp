@@ -266,9 +266,9 @@ class KinectSkeletonVision
 										// 如果当前状态是未锁定，且有人举手，则锁定，存储图像特征
 										if(this -> lockedUserState == UNLOCKED  &&
                                             checkSkeletonGesture(s) == RAISELEFTHAND){
+												vision.newKinectVision(image, s);
 												lockUserID = s.userID;
 												this -> lockedUserState = FOLLOWING;
-												vision.newKinectVision(image, s);
 												// 计时
 												currentTime =ros::Time::now().toSec();
 												cout << "我锁定你了"<< endl;
